@@ -1,4 +1,0 @@
-My Result:	[nan, nan, nan]
-NumPy Result: [-0.125, -1.625, -0.875]
-Absolute error: nan
-Relative error: nan
