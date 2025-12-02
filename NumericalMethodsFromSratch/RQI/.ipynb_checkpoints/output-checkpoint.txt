@@ -1,0 +1,9 @@
+My Result:    1.632240517e+00+0.000000000e+00j
+NumPy Result: 1.632240517e+00
+Absolute error: 6.661338e-16
+Relative error: 4.081101e-16
+
+My Result:    [ 0.56010243 +0.j,  0.37833329 +0.j,  0.494806135+0.j, -0.546183191+0.j]
+NumPy Result: [ 0.56010243 -0.j,  0.37833329 -0.j,  0.494806135-0.j, -0.546183191-0.j]
+Absolute error: 1.291598e-14
+Relative error: 1.291598e-14

@@ -1,0 +1,4 @@
+My Result:	[1., 1., 1.]	Determinant: 1 * e^3.5835189384561086
+NumPy Result: [1., 1., 1.]
+Absolute error: 4.710277e-16
+Relative error: 2.719480e-16

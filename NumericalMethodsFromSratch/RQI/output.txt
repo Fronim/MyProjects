@@ -1,0 +1,10 @@
+My Result:    2.265898751e+00+0.000000000e+00j
+NumPy Result: 2.265898751e+00
+Absolute error: 2.664535e-15
+Relative error: 1.175929e-15
+
+My Result:    [-0.221211268+0.j,  0.572468144+0.j,  0.575859112+0.j, -0.540122284+0.j]
+NumPy Result: [-0.221211268+0.j,  0.572468144+0.j,  0.575859112+0.j, -0.540122284+0.j]
+Absolute error: 5.613218e-16
+Relative error: 5.613218e-16
+Iteration count: 5

@@ -1,0 +1,3 @@
+My Result:	3.NumPy Result: [ 3., -6.,  1.]
+Absolute error: 9.219544e+00
+Relative error: 1.359348e+00
