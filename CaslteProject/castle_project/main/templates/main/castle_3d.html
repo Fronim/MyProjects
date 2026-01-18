@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ castle.title }} | Interactive View</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #050505;
+            --ui-text: #e0e0e0;
+            --accent-gold: #d4af37;
+            --accent-wine: #50081c;
+        }
+        point-wrapper {
+            position: relative;
+            /* Це важливо, щоб діти позиціонувалися відносно центру цієї точки */
+        }
+
+        .point-label {
+            /* Центруємо саму точку всередині wrapper */
+            position: absolute;
+            top: -6px;
+            left: -6px;
+
+            width: 12px;
+            height: 12px;
+            background: var(--accent-gold);
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--accent-gold);
+            transition: transform 0.3s ease, background 0.3s;
+
+            /* 👇 Знижуємо пріоритет точки, щоб вона не лізла нагору */
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        .point-label:hover {
+            transform: scale(1.3);
+            background: #fff;
+        }
+
+        .point-card {
+            display: none;
+            position: absolute;
+
+            /* 👇 МАГІЯ ТУТ: Замість top, використовуємо bottom */
+            top: auto;        /* Скидаємо верхню прив'язку */
+            bottom: 25px;     /* Картка починається на 25px ВИЩЕ точки */
+            left: 50%;        /* Ставимо по центру */
+            transform: translateX(-50%); /* Зсуваємо назад на 50%, щоб центрувати ідеально */
+
+            width: 280px;
+            background: rgba(5, 5, 5, 0.9); /* Трохи темніший фон для читабельності */
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--accent-gold);
+            padding: 15px;
+            border-radius: 8px;
+            color: var(--ui-text);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            pointer-events: none;
+
+            /* 👇 Головний фікс шарів: ставимо набагато більше, ніж у точки */
+            z-index: 100;
+        }
+
+        /* Стрілочка вниз від картки (опціонально, для краси) */
+        .point-card::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            margin-left: -6px;
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: var(--accent-gold) transparent transparent transparent;
+        }
+
+        .point-card h3 {
+            margin: 0 0 8px 0;
+            font-family: 'Playfair Display', serif;
+            color: var(--accent-gold);
+            font-size: 1.1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 5px;
+        }
+
+        .point-card p {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        .point-wrapper:hover .point-card {
+            display: block;
+        }
+
+        body { margin: 0; overflow: hidden; background-color: var(--bg-color); font-family: 'Lato', sans-serif; user-select: none; }
+        #loader-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-color); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999; transition: opacity 0.8s ease-in-out; }
+        .loader-content { text-align: center; position: relative; }
+        .loader-title { font-family: 'Playfair Display', serif; font-size: 2rem; color: var(--accent-gold); margin-bottom: 1rem; letter-spacing: 2px; }
+        .progress-container { width: 200px; height: 1px; background: rgba(255,255,255,0.1); margin: 0 auto; position: relative; overflow: hidden; }
+        .progress-bar { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background-color: var(--accent-gold); transition: width 0.2s ease; box-shadow: 0 0 10px var(--accent-gold); }
+        .loader-percent { margin-top: 10px; font-size: 0.8rem; color: rgba(255,255,255,0.4); letter-spacing: 2px; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .back-link { pointer-events: auto; color: rgba(255,255,255,0.6); text-decoration: none; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 2px; display: flex; align-items: center; gap: 10px; transition: color 0.3s; }
+        .back-link:hover { color: var(--accent-gold); }
+        .back-link span { font-size: 1.2rem; }
+        .info-panel { pointer-events: auto; max-width: 400px; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+        .castle-title { font-family: 'Playfair Display', serif; font-size: 3rem; color: white; margin: 0; line-height: 1; }
+        .castle-subtitle { color: var(--accent-gold); text-transform: uppercase; letter-spacing: 3px; font-size: 0.8rem; margin-top: 10px; font-weight: 700; }
+        .controls-hint { position: absolute; bottom: 40px; right: 40px; text-align: right; color: rgba(255,255,255,0.3); font-size: 0.75rem; line-height: 1.8; border-right: 1px solid rgba(255,255,255,0.2); padding-right: 15px; }
+        .key { color: white; font-weight: bold; }
+        @media (max-width: 768px) { #ui-layer { padding: 20px; } .castle-title { font-size: 2rem; } .controls-hint { display: none; } }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loader-overlay">
+        <div class="loader-content">
+            <div class="loader-title">Відновлення Історії</div>
+            <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+            <div class="loader-percent" id="loader-percent">0%</div>
+        </div>
+    </div>
+
+    <div id="ui-layer">
+        <div class="header">
+            <a href="{% url 'home' %}" class="back-link"><span>&larr;</span> Повернутися</a>
+        </div>
+        <div class="footer">
+            <div class="info-panel">
+                <h1 class="castle-title">{{ castle.title|default:"Kolomyia Castle" }}</h1>
+                <p class="castle-subtitle">Interactive 3D Reconstruction</p>
+            </div>
+            <div class="controls-hint">
+                <div><span class="key">LMB</span> Rotate View</div>
+                <div><span class="key">RMB</span> Pan Camera</div>
+                <div><span class="key">SCROLL</span> Zoom In/Out</div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="webgl"></canvas>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+        import { Water } from 'three/addons/objects/Water.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+        // 👇 1. Імпортуємо рендерер для HTML елементів
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+        const canvas = document.querySelector('#webgl');
+        const scene = new THREE.Scene();
+        const fogColor = 0x050505;
+        scene.background = new THREE.Color(fogColor);
+        scene.fog = new THREE.FogExp2(fogColor, 0.0002);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(15/2, 8/2, 15/2);
+
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.5;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        // 👇 2. Ініціалізація CSS2DRenderer
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        // Важливо: pointerEvents = 'none', щоб проклікувати крізь пусті місця,
+        // але самі лейбли матимуть pointer-events: auto (через CSS клас)
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        document.body.appendChild(labelRenderer.domElement);
+        // Переміщуємо UI шар наверх, щоб він не перекривався
+        document.getElementById('ui-layer').style.zIndex = "100";
+
+        // ... (Твій код для RGBELoader, Lights, Water залишається без змін) ...
+        // ... (RGBELoader, AmbientLight, DirLight, SpotLight, Water, Composer setup...) ...
+
+        new RGBELoader()
+            .setPath('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/')
+            .load('syferfontein_0d_clear_puresky_1k.hdr', function (texture) {
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                scene.background = texture;
+                scene.environment = texture;
+            });
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.02);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfffaed, 3);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // ... (Вода та Composer залишаються без змін) ...
+        // Я скорочую тут для читабельності, але ти свій код води і composer не видаляй!
+        const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
+        const water = new Water( waterGeometry, {
+            textureWidth: 512, textureHeight: 512,
+            waterNormals: new THREE.TextureLoader().load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/waternormals.jpg', function ( texture ) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; }),
+            sunDirection: new THREE.Vector3(), sunColor: 0xffffff, waterColor: 0x001e0f, distortionScale: 3.7, fog: scene.fog !== undefined
+        });
+        water.rotation.x = - Math.PI / 2;
+        scene.add( water );
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(new RenderPass(scene, camera));
+        const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+        bloomPass.threshold = 0.95; bloomPass.strength = 0.2; bloomPass.radius = 2;
+        composer.addPass(bloomPass);
+        composer.addPass(new OutputPass());
+
+        const pointsOfInterest = [
+            {% for point in castle.points.all %}
+            {
+                title: "{{ point.title|escapejs }}",
+                description: "{{ point.description|escapejs }}",
+                pos: {
+                    // Використовуємо stringformat, щоб числа були з крапкою, а не комою (важливо для JS!)
+                    x: {{ point.position_x|stringformat:".2f" }},
+                    y: {{ point.position_y|stringformat:".2f" }},
+                    z: {{ point.position_z|stringformat:".2f" }}
+                }
+            },
+            {% endfor %}
+        ]
+
+        // 👇 4. Функція створення міток
+        pointsOfInterest.forEach(poi => {
+            // Створюємо контейнер
+            const wrapper = document.createElement('div');
+            wrapper.className = 'point-wrapper'; // Для ховер ефекту
+
+            // Створюємо кружечок-точку
+            const pointDiv = document.createElement('div');
+            pointDiv.className = 'point-label';
+            wrapper.appendChild(pointDiv);
+
+            // Створюємо картку з описом
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'point-card';
+            cardDiv.innerHTML = `
+                <h3>${poi.title}</h3>
+                <p>${poi.description}</p>
+            `;
+            wrapper.appendChild(cardDiv);
+
+            // Перетворюємо в 3D об'єкт
+            const labelObject = new CSS2DObject(wrapper);
+            labelObject.position.set(poi.pos.x, poi.pos.y, poi.pos.z);
+
+            // Трохи піднімаємо лейбл над точкою кліку, щоб не перекривав модель
+            labelObject.position.y += 0.2;
+
+            scene.add(labelObject);
+        });
+
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.1;
+        controls.minDistance = 3;
+        controls.maxDistance = 40;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.5;
+        controls.addEventListener('start', () => { controls.autoRotate = false; });
+
+        const loader = new GLTFLoader();
+        const modelUrl = "{{ castle.model_file.url|default:'' }}";
+        // ... (Завантаження моделі без змін, тільки переконайся, що воно тут є) ...
+
+        if (modelUrl) {
+            // ... твій код завантаження ...
+            // Тут я просто скопіював шматок твого лоадера для контексту
+            loader.load(modelUrl, (gltf) => {
+                const model = gltf.scene;
+                // ... скейлінг і позиціонування ...
+                const box = new THREE.Box3().setFromObject(model);
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 10 / maxDim;
+                model.scale.set(scale, scale, scale);
+
+                // Відцентрування...
+                const newBox = new THREE.Box3().setFromObject(model);
+                const center = newBox.getCenter(new THREE.Vector3());
+                model.position.x += (model.position.x - center.x);
+                model.position.z += (model.position.z - center.z);
+                model.position.y = 0 - newBox.min.y - 0.282;
+
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        if(child.material) child.material.envMapIntensity = 1;
+                    }
+                });
+                scene.add(model);
+
+                // Прибираємо лоадер
+                const loadingOverlay = document.getElementById('loader-overlay');
+                loadingOverlay.style.opacity = 0;
+                setTimeout(() => loadingOverlay.remove(), 800);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // 👇 Рендеримо обидва шари
+            composer.render();
+            labelRenderer.render(scene, camera);
+
+            water.material.uniforms[ 'time' ].value += 1.0 / 240.0;
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            // 👇 Оновлюємо розмір для лейблів теж
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>

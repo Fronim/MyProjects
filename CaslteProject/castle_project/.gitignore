@@ -1,0 +1,33 @@
+# --- Python & Virtual Env ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+
+# --- Django ---
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# --- Static & Media ---
+# Ми ігноруємо папку, куди збирається статика для сервера (вона генерується сама)
+staticfiles/
+
+# УВАГА: Зазвичай media/ ігнорують (це завантаження юзерів).
+# Але у тебе там лежать базові картинки дослідників і 3D моделі.
+# Тому поки що НЕ ігноруємо media/, щоб твої файли залетіли на сервер.
+# media/
+
+# --- Environment variables (СУПЕР ВАЖЛИВО) ---
+# Щоб випадково не злити паролі
+.env
+
+# --- IDE & OS ---
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
