@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PRNG Analysis Tool</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1e1e2e; color: #cdd6f4; padding: 40px; }
+        .container { max-width: 900px; margin: auto; background: #313244; padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .input-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; color: #89b4fa; font-size: 0.9em; }
+        input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #45475a; background: #181825; color: white; box-sizing: border-box; }
+        button { background: #a6e3a1; color: #11111b; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; }
+        pre { background: #11111b; padding: 20px; border-radius: 8px; color: #fab387; max-height: 300px; overflow: auto; border: 1px solid #45475a; }
+        .results-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; background: #181825; padding: 15px; border-radius: 8px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" style="color: #f38ba8; text-decoration: none;">< Back to Hub</a>
+        <h2>Linear Congruential Generator</h2>
+        <p>A deterministic algorithm for generating a sequence of pseudo-random numbers.</p>
+
+        <div class="input-group">
+            <div><label>Module</label><input type="number" id="m_val" value="2147483641"></div>
+            <div><label>Multiplier</label><input type="number" id="a_val" value="16384"></div>
+            <div><label>Increment</label><input type="number" id="c_val" value="75025"></div>
+            <div><label>Seed</label><input type="number" id="x0_val" value="41"></div>
+            <div><label>Sample Size</label><input type="number" id="n_val" value="10000"></div>
+        </div>
+        
+
+        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+            <button onclick="runSimulation()" style="flex: 1;">Run LCG</button>
+            <button onclick="runSystemSimulation()" style="flex: 1; background: #cba6f7; color: #11111b;">System PRNG</button>
+            <button onclick="findPeriod()" style="flex: 1; background: #89b4fa; color: #11111b;">Find Period</button>
+        </div>
+
+        <div id="results" class="results-grid" style="grid-template-columns: repeat(4, 1fr);">
+            <div><strong>pi Estimate:</strong> <br><span id="res_pi">-</span></div>
+            <div><strong>Theoretical pi:</strong> <br>3.141593</div>
+            <div><strong>Precision:</strong> <br><span id="res_acc">-</span>%</div>
+            <div><strong>Period:</strong> <br><span id="res_period" style="color:#f38ba8;">-</span></div>
+        </div>
+
+        <h3>API Response</h3>
+        <pre id="output">// Results will appear here...</pre>
+
+        <div id="chart_container" style="margin-top: 30px; background: #181825; padding: 20px; border-radius: 8px; display: none;">
+            <h3 style="margin-top: 0; color: #89b4fa;">Scatter Plot: X(i) vs X(i+1)</h3>
+            <canvas id="prngChart"></canvas>
+        </div>
+    </div>
+
+<script>
+        let prngChart = null; // Додано глобальну змінну для графіка
+
+        async function runSimulation() {
+            const payload = {
+                m: parseInt(document.getElementById('m_val').value),
+                a: parseInt(document.getElementById('a_val').value),
+                c: parseInt(document.getElementById('c_val').value),
+                x0: parseInt(document.getElementById('x0_val').value),
+                count: parseInt(document.getElementById('n_val').value)
+            };
+
+            const response = await fetch('/api/v1/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            document.getElementById('output').textContent = JSON.stringify(result, null, 4);
+
+            document.getElementById('results').style.display = 'grid';
+            document.getElementById('res_pi').textContent = result.statistics.pi_estimate;
+            const accuracy = (1 - (result.statistics.error_margin / Math.PI)) * 100;
+            document.getElementById('res_acc').textContent = accuracy.toFixed(4);
+
+            document.getElementById('chart_container').style.display = 'block';
+
+            const points = [];
+            for (let i = 0; i < result.chart_data.length - 1; i++) {
+                points.push({
+                    x: result.chart_data[i],
+                    y: result.chart_data[i+1]
+                });
+            }
+
+            if (prngChart) {
+                prngChart.destroy();
+            }
+
+            const ctx = document.getElementById('prngChart').getContext('2d');
+            prngChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Згенеровані пари',
+                        data: points,
+                        backgroundColor: '#f38ba8',
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'X(i)', color: '#cdd6f4' },
+                            ticks: { color: '#cdd6f4' }
+                        },
+                        y: {
+                            title: { display: true, text: 'X(i+1)', color: '#cdd6f4' },
+                            ticks: { color: '#cdd6f4' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#cdd6f4' } }
+                    }
+                }
+            });
+        } // Зайва дужка була відразу після цього рядка. Я її прибрав.
+
+        async function findPeriod() {
+            const payload = {
+                m: parseInt(document.getElementById('m_val').value),
+                a: parseInt(document.getElementById('a_val').value),
+                c: parseInt(document.getElementById('c_val').value),
+                x0: parseInt(document.getElementById('x0_val').value)
+            };
+
+            document.getElementById('results').style.display = 'grid';
+            document.getElementById('res_period').textContent = 'Обчислення...';
+
+            const response = await fetch('/api/v1/period', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (result.error) {
+                alert(result.error);
+                document.getElementById('res_period').textContent = 'Помилка';
+            } else if (result.period) {
+                document.getElementById('res_period').textContent = result.period;
+            } else {
+                document.getElementById('res_period').textContent = result.message;
+            }
+        }
+    async function runSystemSimulation() {
+            const payload = {
+                m: parseInt(document.getElementById('m_val').value),
+                count: parseInt(document.getElementById('n_val').value)
+            };
+
+            const response = await fetch('/api/v1/system_generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            // Вивід JSON-відповіді
+            document.getElementById('output').textContent = JSON.stringify(result, null, 4);
+
+            // Оновлення статистики на екрані
+            document.getElementById('results').style.display = 'grid';
+            document.getElementById('res_pi').textContent = result.statistics.pi_estimate;
+            const accuracy = (1 - (result.statistics.error_margin / Math.PI)) * 100;
+            document.getElementById('res_acc').textContent = accuracy.toFixed(4);
+            document.getElementById('res_period').textContent = 'N/A (Дуже великий)'; // Для Вихора Мерсенна період 2^19937 - 1
+
+            // Побудова графіка
+            document.getElementById('chart_container').style.display = 'block';
+
+            const points = [];
+            for (let i = 0; i < result.chart_data.length - 1; i++) {
+                points.push({
+                    x: result.chart_data[i],
+                    y: result.chart_data[i+1]
+                });
+            }
+
+            if (prngChart) {
+                prngChart.destroy();
+            }
+
+            const ctx = document.getElementById('prngChart').getContext('2d');
+            prngChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Системний алгоритм (Вихор Мерсенна)',
+                        data: points,
+                        backgroundColor: '#a6e3a1', // Зелений колір для системи
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'X(i)', color: '#cdd6f4' }, ticks: { color: '#cdd6f4' } },
+                        y: { title: { display: true, text: 'X(i+1)', color: '#cdd6f4' }, ticks: { color: '#cdd6f4' } }
+                    },
+                    plugins: { legend: { labels: { color: '#cdd6f4' } } }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
