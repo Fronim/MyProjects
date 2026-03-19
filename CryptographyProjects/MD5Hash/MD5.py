@@ -28,13 +28,13 @@ class MyMD5:
 
         data += b'\x80'
 
-        while len(data) % 64 != 56:
+        while len(data) % 64 != 56: # 8 * 56 = 448
             data += b'\x00'
 
         data += struct.pack('<Q', original_length_in_bits)
 
 
-        for i in range(0, len(data), 64):
+        for i in range(0, len(data), 64): # збираєм блоки по 64 байтів де розбиваєм його на 16 "слів" які складаються з 4 байтів кожен
             chunk = data[i: i + 64]
             words = list(struct.unpack('<16I', chunk))
             yield words

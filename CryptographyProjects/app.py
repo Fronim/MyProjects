@@ -1,8 +1,12 @@
 import random
+import struct
+import math
+import os
 
 from flask import Flask, request, jsonify, render_template
 from LinearCongruentialGenerator.LCG import LCG
-import math
+from MD5Hash.MD5 import MyMD5
+
 
 app = Flask(__name__)
 app.json.sort_keys = False
@@ -11,6 +15,53 @@ app.json.sort_keys = False
 def home():
     return render_template('index.html')
 
+
+md5_tool = MyMD5()
+
+@app.route('/md5')
+def md5_page():
+    return render_template('md5.html')
+
+@app.route('/api/v1/md5/text', methods=['POST'])
+def api_md5_text():
+    data = request.json
+    if not data or 'text' not in data:
+        return jsonify({"error": "No text provided"}), 400
+
+    md5_tool.hash(data['text'])
+
+    result = struct.pack('<4I', md5_tool.A, md5_tool.B, md5_tool.C, md5_tool.D).hex()
+
+    return jsonify({
+        "input_type": "text",
+        "input_value": data['text'],
+        "hash": result
+    })
+
+
+@app.route('/api/v1/md5/file', methods=['POST'])
+def api_md5_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
+    temp_path = os.path.join("temp_upload.bin")
+    file.save(temp_path)
+
+    try:
+        result = md5_tool.hash_file(temp_path)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return jsonify({
+        "input_type": "file",
+        "filename": file.filename,
+        "hash": result
+    })
 
 @app.route('/lcg')
 def lcg_page():
