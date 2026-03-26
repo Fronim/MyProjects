@@ -1,0 +1,10 @@
+data/*
+*.pth
+*.pt
+*.h5
+*.ckpt
+
+
+venv/
+env/
+__pycache__/
