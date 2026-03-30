@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MD5 Hash Tool</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #1e1e2e; color: #cdd6f4; padding: 40px; }
+        .container { max-width: 800px; margin: auto; background: #313244; padding: 30px; border-radius: 12px; }
+        .tab-container { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; cursor: pointer; background: #45475a; border-radius: 6px; }
+        .tab.active { background: #89b4fa; color: #11111b; }
+        input, textarea { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #45475a; background: #181825; color: white; margin-bottom: 15px; box-sizing: border-box; }
+        button { background: #a6e3a1; color: #11111b; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        pre { background: #11111b; padding: 20px; border-radius: 8px; color: #fab387; overflow: auto; border: 1px solid #45475a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" style="color: #f38ba8; text-decoration: none;">< Back to Hub</a>
+        <h2>MD5 Message-Digest Algorithm</h2>
+
+        <div class="tab-container">
+            <div id="textTab" class="tab active" onclick="switchMode('text')">Text Hash</div>
+            <div id="fileTab" class="tab" onclick="switchMode('file')">File Hash</div>
+        </div>
+
+        <div id="textInputSection">
+            <textarea id="textContent" rows="4" placeholder="Enter text to hash..."></textarea>
+            <button onclick="hashText()">Generate Text Hash</button>
+        </div>
+
+        <div id="fileInputSection" style="display: none;">
+            <input type="file" id="fileContent">
+            <button onclick="hashFile()">Generate File Hash</button>
+        </div>
+
+        <h3>JSON Response</h3>
+        <pre id="output">// Results will appear here...</pre>
+    </div>
+
+    <script>
+        function switchMode(mode) {
+            document.getElementById('textInputSection').style.display = mode === 'text' ? 'block' : 'none';
+            document.getElementById('fileInputSection').style.display = mode === 'file' ? 'block' : 'none';
+            document.getElementById('textTab').classList.toggle('active', mode === 'text');
+            document.getElementById('fileTab').classList.toggle('active', mode === 'file');
+        }
+
+        async function hashText() {
+            const text = document.getElementById('textContent').value;
+            const response = await fetch('/api/v1/md5/text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+            const result = await response.json();
+            document.getElementById('output').textContent = JSON.stringify(result, null, 4);
+        }
+
+        async function hashFile() {
+            const fileInput = document.getElementById('fileContent');
+            if (fileInput.files.length === 0) return alert("Select a file");
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            const response = await fetch('/api/v1/md5/file', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            document.getElementById('output').textContent = JSON.stringify(result, null, 4);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RC5-CBC-Pad Encryption</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1e1e2e; color: #cdd6f4; padding: 40px; }
+        .container { max-width: 600px; margin: auto; background: #313244; padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .input-group { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; color: #89b4fa; font-size: 0.9em; }
+        input, select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #45475a; background: #181825; color: white; box-sizing: border-box; }
+        input[type="file"] { padding: 8px; }
+        .btn-group { display: flex; gap: 15px; margin-top: 20px; }
+        button { border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; }
+        .btn-encrypt { background: #f38ba8; color: #11111b; }
+        .btn-encrypt:hover { background: #d2738f; }
+        .btn-decrypt { background: #a6e3a1; color: #11111b; }
+        .btn-decrypt:hover { background: #8bc287; }
+        .status { margin-top: 20px; padding: 15px; border-radius: 8px; display: none; background: #181825; border: 1px solid #45475a; }
+        .error { color: #f38ba8; }
+        .success { color: #a6e3a1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" style="color: #89b4fa; text-decoration: none;">< Back to Hub</a>
+        <h2>RC5 File Encryption (CBC-Pad)</h2>
+        <p>Зашифруйте або розшифруйте файли довільного розміру.</p>
+
+        <form id="rc5Form">
+            <div class="input-group">
+                <div>
+                    <label>Файл</label>
+                    <input type="file" id="file" required>
+                </div>
+                <div>
+                    <label>Парольна фраза</label>
+                    <input type="password" id="password" placeholder="Введіть ваш секретний пароль" required>
+                </div>
+                <div>
+                    <label>Довжина ключа (біти)</label>
+                    <select id="key_length">
+                        <option value="64">64 біти (слабкий)</option>
+                        <option value="128" selected>128 бітів (стандарт)</option>
+                        <option value="256">256 бітів (сильний)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button type="button" class="btn-encrypt" onclick="processFile('encrypt')">Зашифрувати</button>
+                <button type="button" class="btn-decrypt" onclick="processFile('decrypt')">Розшифрувати</button>
+            </div>
+        </form>
+
+        <div id="statusMessage" class="status"></div>
+    </div>
+
+    <script>
+        async function processFile(action) {
+            const fileInput = document.getElementById('file');
+            const password = document.getElementById('password').value;
+            const keyLength = document.getElementById('key_length').value;
+            const statusDiv = document.getElementById('statusMessage');
+
+            if (!fileInput.files.length) {
+                showStatus('Оберіть файл!', 'error');
+                return;
+            }
+            if (!password) {
+                showStatus('Введіть парольну фразу!', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('password', password);
+            formData.append('key_length', keyLength);
+            formData.append('action', action);
+
+            showStatus(`Обробка файлу (${action})... Зачекайте.`, 'success');
+
+            try {
+                const response = await fetch('/api/v1/rc5/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    // Отримуємо файл як Blob
+                    const blob = await response.blob();
+
+                    // Отримуємо ім'я файлу з заголовків (якщо є), інакше генеруємо своє
+                    let filename = action === 'encrypt' ? 'encrypted_file' : 'decrypted_file';
+                    const disposition = response.headers.get('Content-Disposition');
+                    if (disposition && disposition.indexOf('attachment') !== -1) {
+                        const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                        const matches = filenameRegex.exec(disposition);
+                        if (matches != null && matches[1]) {
+                            filename = matches[1].replace(/['"]/g, '');
+                        }
+                    }
+
+                    // Створюємо тимчасове посилання для завантаження
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = downloadUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+
+                    // Прибираємо
+                    window.URL.revokeObjectURL(downloadUrl);
+                    a.remove();
+
+                    showStatus('Операція успішна! Завантаження почалося.', 'success');
+                } else {
+                    const result = await response.json();
+                    showStatus(result.error || 'Помилка сервера', 'error');
+                }
+            } catch (error) {
+                showStatus('Сталася помилка при відправці запиту.', 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.style.display = 'block';
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+    </script>
+</body>
+</html>

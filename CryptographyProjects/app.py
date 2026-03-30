@@ -2,7 +2,10 @@ import random
 import struct
 import math
 import os
+import io
+from flask import send_file
 
+from RC5Encryption.RC5 import RC5FileProcessor
 from flask import Flask, request, jsonify, render_template
 from LinearCongruentialGenerator.LCG import LCG
 from MD5Hash.MD5 import MyMD5
@@ -153,3 +156,63 @@ def api_system_generate():
         },
         "chart_data": sys_numbers[:1000]
     })
+
+
+
+@app.route('/rc5')
+def rc5_page():
+    return render_template('rc5.html')
+
+
+@app.route('/api/v1/rc5/process', methods=['POST'])
+def api_rc5_process():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
+    password = request.form.get('password')
+    key_length = int(request.form.get('key_length', 128))
+    action = request.form.get('action')  # 'encrypt' або 'decrypt'
+
+    if not password:
+        return jsonify({"error": "Введіть парольну фразу"}), 400
+
+    input_path = os.path.join(f"temp_rc5_in_{file.filename}")
+    output_path = os.path.join(f"temp_rc5_out_{file.filename}")
+
+    file.save(input_path)
+
+    try:
+        processor = RC5FileProcessor(password=password, key_length_bits=key_length)
+
+        if action == 'encrypt':
+            processor.encrypt_file(input_path, output_path)
+            prefix = "encrypted_"
+        elif action == 'decrypt':
+            processor.decrypt_file(input_path, output_path)
+            prefix = "decrypted_"
+        else:
+            return jsonify({"error": "Невідома дія"}), 400
+
+        with open(output_path, 'rb') as f:
+            return_data = io.BytesIO(f.read())
+
+        return send_file(
+            return_data,
+            as_attachment=True,
+            download_name=f"{prefix}{file.filename}",
+            mimetype='application/octet-stream'
+        )
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Сталася помилка: {str(e)}"}), 500
+    finally:
+        if os.path.exists(input_path):
+            os.remove(input_path)
+        if os.path.exists(output_path):
+            os.remove(output_path)
