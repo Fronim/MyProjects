@@ -5,14 +5,24 @@ from MD5Hash.MD5 import MyMD5
 from LinearCongruentialGenerator.LCG import LCG
 
 
-# Допоміжні функції для додавання та зняття паддінгу (PKCS#7)
 def pad(data: bytes, block_size: int) -> bytes:
     padding_len = block_size - (len(data) % block_size)
     return data + bytes([padding_len] * padding_len)
 
 
-def unpad(data: bytes) -> bytes:
+def unpad(data: bytes, block_size: int) -> bytes:
+    if not data:
+        return data
+
     padding_len = data[-1]
+
+    if padding_len < 1 or padding_len > block_size:
+        raise ValueError("Неправильний пароль або файл пошкоджено (помилка паддінгу)")
+
+    expected_padding = bytes([padding_len] * padding_len)
+    if data[-padding_len:] != expected_padding:
+        raise ValueError("Неправильний пароль або файл пошкоджено (помилка паддінгу)")
+
     return data[:-padding_len]
 
 
@@ -21,7 +31,6 @@ def xor_bytes(b1: bytes, b2: bytes) -> bytes:
 
 
 class RC5:
-    """Основний алгоритм шифрування RC5"""
 
     def __init__(self, key: bytes, w: int = 32, r: int = 12):
         self.w = w
@@ -32,7 +41,6 @@ class RC5:
         self.c = max(1, (self.b + self.u - 1) // self.u)
         self.S = []
 
-        # Магічні константи для w=32
         if w == 32:
             self.P = 0xB7E15163
             self.Q = 0x9E3779B9
@@ -99,7 +107,6 @@ class RC5:
 
 
 class RC5FileProcessor:
-    """Клас для роботи з файлами в режимі RC5-CBC-Pad"""
 
     def __init__(self, password: str, key_length_bits: int = 128, w: int = 32, r: int = 12):
         self.key = self._derive_key(password, key_length_bits)
@@ -113,7 +120,6 @@ class RC5FileProcessor:
         hash_p = struct.pack('<4I', md5.A, md5.B, md5.C, md5.D)
 
         if key_length_bits == 64:
-            # молодші 64 біти хешу (перші 8 байтів)
             return hash_p[:8]
         elif key_length_bits == 128:
             return hash_p
@@ -127,19 +133,15 @@ class RC5FileProcessor:
             raise ValueError("Непідтримувана довжина ключа")
 
     def encrypt_file(self, input_filepath: str, output_filepath: str):
-        # Генерація IV за допомогою LCG (Лаб 1)
         seed = int(time.time() * 1000) % (2 ** 31 - 7)
         lcg = LCG(x0=seed)
 
-        # Генеруємо 2 слова по 32 біти (разом 8 байт для блоку)
         iv_words = lcg.generate(self.block_size // 4)
         iv = struct.pack(f'<{len(iv_words)}I', *iv_words)[:self.block_size]
 
-        # Зашифровуємо IV в режимі ECB
         encrypted_iv = self.rc5.encrypt_block(iv)
 
         with open(input_filepath, 'rb') as f_in, open(output_filepath, 'wb') as f_out:
-            # Зберігаємо зашифрований IV в першому блоці файлу
             f_out.write(encrypted_iv)
 
             prev_block = iv
@@ -147,7 +149,6 @@ class RC5FileProcessor:
                 chunk = f_in.read(self.block_size)
 
                 if len(chunk) < self.block_size:
-                    # Додаємо паддінг до останнього блоку (навіть якщо він порожній)
                     padded_chunk = pad(chunk, self.block_size)
                     ct_block = self.rc5.encrypt_block(xor_bytes(padded_chunk, prev_block))
                     f_out.write(ct_block)
@@ -159,7 +160,6 @@ class RC5FileProcessor:
 
     def decrypt_file(self, input_filepath: str, output_filepath: str):
         with open(input_filepath, 'rb') as f_in, open(output_filepath, 'wb') as f_out:
-            # Читаємо зашифрований IV (перший блок)
             encrypted_iv = f_in.read(self.block_size)
             if len(encrypted_iv) < self.block_size:
                 raise ValueError("Файл занадто малий або пошкоджений")
@@ -167,7 +167,6 @@ class RC5FileProcessor:
             iv = self.rc5.decrypt_block(encrypted_iv)
             prev_block = iv
 
-            # Тримаємо останній дешифрований блок в пам'яті для правильного зняття паддінгу
             prev_decrypted_chunk = b""
 
             while True:
@@ -183,21 +182,6 @@ class RC5FileProcessor:
 
                 prev_decrypted_chunk = pt_block
 
-            # Знімаємо паддінг з останнього блоку
             if prev_decrypted_chunk:
-                unpadded = unpad(prev_decrypted_chunk)
+                unpadded = unpad(prev_decrypted_chunk, self.block_size)
                 f_out.write(unpadded)
-
-
-if __name__ == "__main__":
-    password = "MySuperSecretPassword"
-    processor = RC5FileProcessor(password=password, key_length_bits=128)
-
-    with open("test.txt", "wb") as f:
-        f.write(b"Hello World! This is a test file for RC5-CBC-Pad mode.")
-
-    processor.encrypt_file("test.txt", "encrypted.bin")
-
-    processor.decrypt_file("encrypted.bin", "decrypted.txt")
-
-    print("Шифрування і дешифрування завершено успішно.")
