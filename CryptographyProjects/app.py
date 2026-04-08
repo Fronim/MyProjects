@@ -3,13 +3,14 @@ import struct
 import math
 import os
 import io
-from flask import send_file
+import tempfile
+import zipfile
 
 from RC5Encryption.RC5 import RC5FileProcessor
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_file
 from LinearCongruentialGenerator.LCG import LCG
 from MD5Hash.MD5 import MyMD5
-
+from RSAEncryption.RSA import RSACipher
 
 app = Flask(__name__)
 app.json.sort_keys = False
@@ -216,3 +217,101 @@ def api_rc5_process():
             os.remove(input_path)
         if os.path.exists(output_path):
             os.remove(output_path)
+
+
+@app.route('/rsa', methods=['GET', 'POST'])
+def rsa():
+    error = None
+    message = None
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        try:
+            if action == 'generate_keys':
+                key_size = int(request.form.get('key_size', 2048))
+                cipher = RSACipher(key_size=key_size)
+                cipher.generate_keys()
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    priv_path = os.path.join(temp_dir, 'private.pem')
+                    pub_path = os.path.join(temp_dir, 'public.pem')
+                    cipher.save_keys(priv_path, pub_path)
+
+                    memory_file = io.BytesIO()
+                    with zipfile.ZipFile(memory_file, 'w') as zf:
+                        zf.write(priv_path, 'private.pem')
+                        zf.write(pub_path, 'public.pem')
+                    memory_file.seek(0)
+
+                return send_file(
+                    memory_file,
+                    mimetype='application/zip',
+                    as_attachment=True,
+                    download_name='rsa_keys.zip'
+                )
+
+            elif action == 'encrypt':
+                file_to_encrypt = request.files.get('file_to_encrypt')
+                public_key_file = request.files.get('public_key')
+
+                if not file_to_encrypt or not public_key_file:
+                    raise ValueError("Будь ласка, завантажте файл та публічний ключ.")
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    in_path = os.path.join(temp_dir, 'input_file')
+                    pub_path = os.path.join(temp_dir, 'public.pem')
+                    out_path = os.path.join(temp_dir, 'encrypted.bin')
+
+                    file_to_encrypt.save(in_path)
+                    public_key_file.save(pub_path)
+
+                    cipher = RSACipher()
+                    cipher.load_public_key(pub_path)
+                    cipher.encrypt_file(in_path, out_path)
+
+                    with open(out_path, 'rb') as f:
+                        return_data = io.BytesIO(f.read())
+
+                return send_file(
+                    return_data,
+                    as_attachment=True,
+                    download_name=f"{file_to_encrypt.filename}.encrypted"
+                )
+
+            elif action == 'decrypt':
+                file_to_decrypt = request.files.get('file_to_decrypt')
+                private_key_file = request.files.get('private_key')
+
+                if not file_to_decrypt or not private_key_file:
+                    raise ValueError("Будь ласка, завантажте зашифрований файл та приватний ключ.")
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    in_path = os.path.join(temp_dir, 'encrypted_file')
+                    priv_path = os.path.join(temp_dir, 'private.pem')
+                    out_path = os.path.join(temp_dir, 'decrypted_file')
+
+                    file_to_decrypt.save(in_path)
+                    private_key_file.save(priv_path)
+
+                    cipher = RSACipher()
+                    cipher.load_private_key(priv_path)
+                    cipher.decrypt_file(in_path, out_path)
+
+                    with open(out_path, 'rb') as f:
+                        return_data = io.BytesIO(f.read())
+
+                original_name = file_to_decrypt.filename.replace('.encrypted', '')
+                if original_name == file_to_decrypt.filename:
+                    original_name = "decrypted_" + file_to_decrypt.filename
+
+                return send_file(
+                    return_data,
+                    as_attachment=True,
+                    download_name=original_name
+                )
+
+        except Exception as e:
+            error = f"Помилка: {str(e)}"
+
+    return render_template('rsa.html', error=error, message=message)

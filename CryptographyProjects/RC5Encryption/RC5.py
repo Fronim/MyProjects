@@ -114,7 +114,6 @@ class RC5FileProcessor:
         self.block_size = (w // 8) * 2
 
     def _derive_key(self, password: str, key_length_bits: int) -> bytes:
-        """Перетворення парольної фрази у ключ за допомогою MD5 (Лаб 2)"""
         md5 = MyMD5()
         md5.hash(password.encode('utf-8'))
         hash_p = struct.pack('<4I', md5.A, md5.B, md5.C, md5.D)
@@ -124,7 +123,6 @@ class RC5FileProcessor:
         elif key_length_bits == 128:
             return hash_p
         elif key_length_bits == 256:
-            # K = H(H(P)) || H(P)
             md5_2 = MyMD5()
             md5_2.hash(hash_p)
             hash_h_p = struct.pack('<4I', md5_2.A, md5_2.B, md5_2.C, md5_2.D)

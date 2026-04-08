@@ -25,31 +25,30 @@
     <div class="container">
         <a href="/" style="color: #89b4fa; text-decoration: none;">< Back to Hub</a>
         <h2>RC5 File Encryption</h2>
-        <p>Зашифруйте або розшифруйте файли довільного розміру.</p>
 
         <form id="rc5Form">
             <div class="input-group">
                 <div>
-                    <label>Файл</label>
+                    <label>File</label>
                     <input type="file" id="file" required>
                 </div>
                 <div>
-                    <label>Парольна фраза</label>
-                    <input type="password" id="password" placeholder="Введіть ваш секретний пароль" required>
+                    <label>Password</label>
+                    <input type="password" id="password" required>
                 </div>
                 <div>
-                    <label>Довжина ключа</label>
+                    <label>Key length</label>
                     <select id="key_length">
-                        <option value="64">64 біти</option>
-                        <option value="128" selected>128 бітів</option>
-                        <option value="256">256 бітів</option>
+                        <option value="64">64 bits</option>
+                        <option value="128" selected>128 bits</option>
+                        <option value="256">256 bits</option>
                     </select>
                 </div>
             </div>
 
             <div class="btn-group">
-                <button type="button" class="btn-encrypt" onclick="processFile('encrypt')">Зашифрувати</button>
-                <button type="button" class="btn-decrypt" onclick="processFile('decrypt')">Розшифрувати</button>
+                <button type="button" class="btn-encrypt" onclick="processFile('encrypt')">Encrypt</button>
+                <button type="button" class="btn-decrypt" onclick="processFile('decrypt')">Decrypt</button>
             </div>
         </form>
 

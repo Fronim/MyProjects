@@ -105,3 +105,20 @@ class RSACipher:
                     )
                 )
                 f_out.write(decrypted_chunk)
+
+    def load_public_key(self, public_path):
+        with open(public_path, 'rb') as f:
+            self.public_key = serialization.load_pem_public_key(
+                f.read(),
+                backend=default_backend()
+            )
+
+    def load_private_key(self, private_path, password=None):
+        if password and isinstance(password, str):
+            password = password.encode()
+        with open(private_path, 'rb') as f:
+            self.private_key = serialization.load_pem_private_key(
+                f.read(),
+                password=password,
+                backend=default_backend()
+            )
