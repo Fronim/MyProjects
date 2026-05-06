@@ -39,7 +39,7 @@ class DSSManager:
                 )
             )
 
-    def load_private_key(self, private_path: str, password: str = "secret_pass_123"):
+    def load_private_key(self, private_path: str, password: str = "some_password_123"):
         password_bytes = password.encode('utf-8')
         with open(private_path, "rb") as f:
             self.private_key = serialization.load_pem_private_key(f.read(), password=password_bytes)
