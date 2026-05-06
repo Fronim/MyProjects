@@ -10,6 +10,9 @@
         h2 { text-align: center; color: #cdd6f4; margin-bottom: 10px; }
         p.subtitle { text-align: center; color: #a6adc8; margin-bottom: 30px; font-size: 0.95em; }
 
+        .back-link { color: #89b4fa; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+
         .tab-container { display: flex; gap: 10px; margin-bottom: 25px; justify-content: center; }
         .tab { padding: 10px 20px; cursor: pointer; background: #45475a; border-radius: 6px; font-weight: 500; transition: background 0.2s, color 0.2s; }
         .tab.active { background: #89b4fa; color: #11111b; font-weight: bold; }
@@ -18,6 +21,9 @@
         .section.active { display: block; }
 
         .input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+        /* Клас для приховування елементів без інлайн-стилів */
+        .hidden { display: none !important; }
+
         label { display: block; color: #89b4fa; font-size: 0.9em; font-weight: 600; }
         input, select, textarea { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #45475a; background: #181825; color: white; box-sizing: border-box; }
         input[type="file"] { padding: 9px; cursor: pointer; }
@@ -27,6 +33,7 @@
         button:hover { opacity: 0.9; }
 
         .status { margin-top: 20px; padding: 15px; border-radius: 6px; text-align: center; display: none; font-weight: 500; }
+        .status-visible { display: block; margin-bottom: 20px; }
         .success { background: rgba(166, 227, 161, 0.15); border: 1px solid #a6e3a1; color: #a6e3a1; }
         .error { background: rgba(243, 139, 168, 0.15); border: 1px solid #f38ba8; color: #f38ba8; }
 
@@ -37,7 +44,7 @@
 <body>
 
     <div class="container">
-        <a href="/" style="color: #89b4fa; text-decoration: none;">< Back to Hub</a>
+        <a href="/" class="back-link">&lt; Back to Hub</a>
         <h2>DSS Digital Signature</h2>
         <div class="tab-container">
             <div class="tab active" id="generateTab" onclick="switchMode('generate')">Key Generation</div>
@@ -46,10 +53,10 @@
         </div>
 
         {% if error %}
-        <div class="status error" style="display: block; margin-bottom: 20px;">{{ error }}</div>
+        <div class="status error status-visible">{{ error }}</div>
         {% endif %}
         {% if message %}
-        <div class="status success" style="display: block; margin-bottom: 20px;">{{ message }}</div>
+        <div class="status success status-visible">{{ message }}</div>
         {% endif %}
 
         <div id="generateSection" class="section active">
@@ -72,36 +79,35 @@
                 <input type="hidden" name="action" id="sign_action" value="sign_text">
 
                 <div class="input-group">
-                    <label>What do you want to sign?</label>
-                    <select id="sign_type" onchange="toggleSignType()">
+                    <label for="sign_type">What do you want to sign?</label>
+                    <select id="sign_type" name="sign_type" onchange="toggleSignType()">
                         <option value="text">Text String</option>
                         <option value="file">File</option>
                     </select>
                 </div>
 
                 <div class="input-group" id="sign_text_group">
-                    <label>Text to Sign:</label>
-                    <textarea name="text_to_sign" placeholder="Enter your text here..."></textarea>
+                    <label for="text_to_sign">Text to Sign:</label>
+                    <textarea id="text_to_sign" name="text_to_sign" placeholder="Enter your text here..."></textarea>
                 </div>
 
-                <div class="input-group" id="sign_file_group" style="display: none;">
-                    <label>File to Sign:</label>
-                    <input type="file" name="file_to_sign">
+                <div class="input-group hidden" id="sign_file_group">
+                    <label for="file_to_sign">File to Sign:</label>
+                    <input id="file_to_sign" type="file" name="file_to_sign">
                 </div>
 
                 <div class="input-group">
-                    <label>Private Key (.pem):</label>
-                    <input type="file" name="private_key" accept=".pem" required>
+                    <label for="private_key_sign">Private Key (.pem):</label>
+                    <input id="private_key_sign" type="file" name="private_key" accept=".pem" required>
                 </div>
 
                 <button type="submit">Generate Signature</button>
             </form>
 
-            <!-- Блок відображення згенерованого підпису -->
             {% if signature %}
             <div class="signature-box">
-                <label>Generated Signature (HEX):</label>
-                <textarea readonly>{{ signature }}</textarea>
+                <label for="generated_signature">Generated Signature (HEX):</label>
+                <textarea id="generated_signature" readonly>{{ signature }}</textarea>
             </div>
             {% endif %}
         </div>
@@ -111,31 +117,31 @@
                 <input type="hidden" name="action" id="verify_action" value="verify_text">
 
                 <div class="input-group">
-                    <label>What are you verifying?</label>
-                    <select id="verify_type" onchange="toggleVerifyType()">
+                    <label for="verify_type">What are you verifying?</label>
+                    <select id="verify_type" name="verify_type" onchange="toggleVerifyType()">
                         <option value="text">Text String</option>
                         <option value="file">File</option>
                     </select>
                 </div>
 
                 <div class="input-group" id="verify_text_group">
-                    <label>Original Text:</label>
-                    <textarea name="text_to_verify" placeholder="Enter the original text..."></textarea>
+                    <label for="text_to_verify">Original Text:</label>
+                    <textarea id="text_to_verify" name="text_to_verify" placeholder="Enter the original text..."></textarea>
                 </div>
 
-                <div class="input-group" id="verify_file_group" style="display: none;">
-                    <label>Original File:</label>
-                    <input type="file" name="file_to_verify">
-                </div>
-
-                <div class="input-group">
-                    <label>Signature (HEX):</label>
-                    <textarea name="signature_hex" placeholder="Paste the HEX signature here..." required></textarea>
+                <div class="input-group hidden" id="verify_file_group">
+                    <label for="file_to_verify">Original File:</label>
+                    <input id="file_to_verify" type="file" name="file_to_verify">
                 </div>
 
                 <div class="input-group">
-                    <label>Public Key (.pem):</label>
-                    <input type="file" name="public_key" accept=".pem" required>
+                    <label for="signature_hex">Signature (HEX):</label>
+                    <textarea id="signature_hex" name="signature_hex" placeholder="Paste the HEX signature here..." required></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label for="public_key_verify">Public Key (.pem):</label>
+                    <input id="public_key_verify" type="file" name="public_key" accept=".pem" required>
                 </div>
 
                 <button type="submit">Verify Signature</button>
@@ -145,7 +151,6 @@
     </div>
 
     <script>
-
         function switchMode(mode) {
             document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
@@ -156,26 +161,40 @@
             localStorage.setItem('dssActiveTab', mode);
         }
 
-        // Перемикання полів для підпису (Текст / Файл)
+        // Оновлено логіку для використання класів замість style.display
         function toggleSignType() {
             const type = document.getElementById('sign_type').value;
             document.getElementById('sign_action').value = type === 'text' ? 'sign_text' : 'sign_file';
-            document.getElementById('sign_text_group').style.display = type === 'text' ? 'flex' : 'none';
-            document.getElementById('sign_file_group').style.display = type === 'file' ? 'flex' : 'none';
+
+            if (type === 'text') {
+                document.getElementById('sign_text_group').classList.remove('hidden');
+                document.getElementById('sign_file_group').classList.add('hidden');
+            } else {
+                document.getElementById('sign_text_group').classList.add('hidden');
+                document.getElementById('sign_file_group').classList.remove('hidden');
+            }
         }
 
-        // Перемикання полів для верифікації (Текст / Файл)
         function toggleVerifyType() {
             const type = document.getElementById('verify_type').value;
             document.getElementById('verify_action').value = type === 'text' ? 'verify_text' : 'verify_file';
-            document.getElementById('verify_text_group').style.display = type === 'text' ? 'flex' : 'none';
-            document.getElementById('verify_file_group').style.display = type === 'file' ? 'flex' : 'none';
+
+            if (type === 'text') {
+                document.getElementById('verify_text_group').classList.remove('hidden');
+                document.getElementById('verify_file_group').classList.add('hidden');
+            } else {
+                document.getElementById('verify_text_group').classList.add('hidden');
+                document.getElementById('verify_file_group').classList.remove('hidden');
+            }
         }
 
-        // Відновлення вкладки після перезавантаження сторінки (відправки форми)
         window.onload = function() {
             const activeTab = localStorage.getItem('dssActiveTab') || 'generate';
             switchMode(activeTab);
+
+            // Синхронізуємо стан полів із селектами при завантаженні
+            toggleSignType();
+            toggleVerifyType();
         };
     </script>
 </body>

@@ -10,6 +10,9 @@
         h2 { text-align: center; color: #cdd6f4; margin-bottom: 10px; }
         p.subtitle { text-align: center; color: #a6adc8; margin-bottom: 30px; font-size: 0.95em; }
 
+        .back-link { color: #89b4fa; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+
         .tab-container { display: flex; gap: 10px; margin-bottom: 25px; justify-content: center; }
         .tab { padding: 10px 20px; cursor: pointer; background: #45475a; border-radius: 6px; font-weight: 500; transition: background 0.2s, color 0.2s; }
         .tab.active { background: #89b4fa; color: #11111b; font-weight: bold; }
@@ -26,151 +29,99 @@
         button:hover { opacity: 0.9; }
 
         .status { margin-top: 20px; padding: 15px; border-radius: 6px; text-align: center; display: none; font-weight: 500; }
+        .status-visible { display: block; margin-bottom: 20px; }
         .success { background: rgba(166, 227, 161, 0.15); border: 1px solid #a6e3a1; color: #a6e3a1; }
         .error { background: rgba(243, 139, 168, 0.15); border: 1px solid #f38ba8; color: #f38ba8; }
-
-        .nav-link { display: block; text-align: center; margin-top: 25px; color: #89b4fa; text-decoration: none; font-size: 0.9em; }
-        .nav-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <a href="/" style="color: #89b4fa; text-decoration: none;">< Back to Hub</a>
-        <h2>RSA Asymmetric Encryption</h2>
-
+        <a href="/" class="back-link">&lt; Back to Hub</a>
+        <h2>RSA Encryption & Decryption</h2>
         <div class="tab-container">
-            <div class="tab active" id="genTab" onclick="switchMode('generate')">Key Generation</div>
-            <div class="tab" id="encTab" onclick="switchMode('encrypt')">Encryption</div>
-            <div class="tab" id="decTab" onclick="switchMode('decrypt')">Decryption</div>
+            <div class="tab active" id="generateTab" onclick="switchMode('generate')">Key Generation</div>
+            <div class="tab" id="encryptTab" onclick="switchMode('encrypt')">Encrypt File</div>
+            <div class="tab" id="decryptTab" onclick="switchMode('decrypt')">Decrypt File</div>
         </div>
 
-        <div id="genSection" class="section active">
-            <div class="input-group">
-                <label for="key_size">Key Size:</label>
-                <select id="key_size">
-                    <option value="1024">1024 bits</option>
-                    <option value="2048" selected>2048 bits</option>
-                    <option value="4096">4096 bits</option>
-                </select>
-            </div>
-            <button onclick="processAction('generate_keys')">Generate and Download Keys</button>
+        {% if error %}
+        <div class="status error status-visible">{{ error }}</div>
+        {% endif %}
+        {% if message %}
+        <div class="status success status-visible">{{ message }}</div>
+        {% endif %}
+
+        <div id="generateSection" class="section active">
+            <form action="/rsa" method="POST">
+                <input type="hidden" name="action" value="generate_keys">
+                <div class="input-group">
+                    <label for="key_size">Key Size:</label>
+                    <select name="key_size" id="key_size">
+                        <option value="1024">1024 bits</option>
+                        <option value="2048" selected>2048 bits</option>
+                        <option value="3072">3072 bits</option>
+                    </select>
+                </div>
+                <button type="submit">Generate and Download Keys</button>
+            </form>
         </div>
 
-        <div id="encSection" class="section">
-            <div class="input-group">
-                <label>Unencrypted File:</label>
-                <input type="file" id="file_to_encrypt">
-            </div>
-            <div class="input-group">
-                <label>Public Key:</label>
-                <input type="file" id="public_key" accept=".pem">
-            </div>
-            <button onclick="processAction('encrypt')">Encrypt File</button>
+        <div id="encryptSection" class="section">
+            <form action="/rsa" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="encrypt">
+                <div class="input-group">
+                    <label for="file_to_encrypt">File to Encrypt:</label>
+                    <input id="file_to_encrypt" type="file" name="file_to_encrypt" required>
+                </div>
+                <div class="input-group">
+                    <label for="public_key_encrypt">Public Key (.pem):</label>
+                    <input id="public_key_encrypt" type="file" name="public_key" accept=".pem" required>
+                </div>
+                <button type="submit">Encrypt File</button>
+            </form>
         </div>
 
-        <div id="decSection" class="section">
-            <div class="input-group">
-                <label>Encrypted File:</label>
-                <input type="file" id="file_to_decrypt">
-            </div>
-            <div class="input-group">
-                <label>Private Key:</label>
-                <input type="file" id="private_key" accept=".pem">
-            </div>
-            <button onclick="processAction('decrypt')">Decrypt File</button>
+        <div id="decryptSection" class="section">
+            <form action="/rsa" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="decrypt">
+                <div class="input-group">
+                    <label for="file_to_decrypt">File to Decrypt (encrypted.bin):</label>
+                    <input id="file_to_decrypt" type="file" name="file_to_decrypt" required>
+                </div>
+                <div class="input-group">
+                    <label for="private_key_decrypt">Private Key (.pem):</label>
+                    <input id="private_key_decrypt" type="file" name="private_key" accept=".pem" required>
+                </div>
+                <button type="submit">Decrypt File</button>
+            </form>
         </div>
 
-        <div id="statusMessage" class="status"></div>
     </div>
 
     <script>
-        // Switch between tabs
         function switchMode(mode) {
-            document.getElementById('genSection').classList.toggle('active', mode === 'generate');
-            document.getElementById('encSection').classList.toggle('active', mode === 'encrypt');
-            document.getElementById('decSection').classList.toggle('active', mode === 'decrypt');
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
 
-            document.getElementById('genTab').classList.toggle('active', mode === 'generate');
-            document.getElementById('encTab').classList.toggle('active', mode === 'encrypt');
-            document.getElementById('decTab').classList.toggle('active', mode === 'decrypt');
+            document.getElementById(mode + 'Section').classList.add('active');
+            document.getElementById(mode + 'Tab').classList.add('active');
 
-            document.getElementById('statusMessage').style.display = 'none';
+            localStorage.setItem('rsaActiveTab', mode);
+            hideMessages();
         }
 
-        // Display status messages
-        function showStatus(message, type) {
-            const statusDiv = document.getElementById('statusMessage');
-            statusDiv.style.display = 'block';
-            statusDiv.textContent = message;
-            statusDiv.className = `status ${type}`;
+        function hideMessages() {
+            document.querySelectorAll('.status').forEach(el => {
+                el.classList.remove('status-visible');
+                el.style.display = 'none';
+            });
         }
 
-        // Process requests to the server
-        async function processAction(action) {
-            const formData = new FormData();
-            formData.append('action', action);
-
-            if (action === 'generate_keys') {
-                formData.append('key_size', document.getElementById('key_size').value);
-                showStatus('Generating keys, please wait...', 'success');
-            }
-            else if (action === 'encrypt') {
-                const fileToEncrypt = document.getElementById('file_to_encrypt').files[0];
-                const publicKey = document.getElementById('public_key').files[0];
-                if (!fileToEncrypt || !publicKey) return showStatus('Please select a file and a public key!', 'error');
-
-                formData.append('file_to_encrypt', fileToEncrypt);
-                formData.append('public_key', publicKey);
-                showStatus('Encrypting file, please wait...', 'success');
-            }
-            else if (action === 'decrypt') {
-                const fileToDecrypt = document.getElementById('file_to_decrypt').files[0];
-                const privateKey = document.getElementById('private_key').files[0];
-                if (!fileToDecrypt || !privateKey) return showStatus('Please select an encrypted file and a private key!', 'error');
-
-                formData.append('file_to_decrypt', fileToDecrypt);
-                formData.append('private_key', privateKey);
-                showStatus('Decrypting file, please wait...', 'success');
-            }
-
-            try {
-                const response = await fetch('/rsa', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    const blob = await response.blob();
-
-                    const disposition = response.headers.get('Content-Disposition');
-                    let filename = "result_file";
-                    if (disposition && disposition.indexOf('attachment') !== -1) {
-                        const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-                        const matches = filenameRegex.exec(disposition);
-                        if (matches != null && matches[1]) {
-                            filename = matches[1].replace(/['"]/g, '');
-                        }
-                    }
-
-                    const downloadUrl = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = downloadUrl;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(downloadUrl);
-                    a.remove();
-
-                    showStatus('Operation successful! File is downloading.', 'success');
-                } else {
-                    showStatus('A server error occurred.', 'error');
-                }
-            } catch (error) {
-                showStatus('A network error occurred.', 'error');
-            }
-        }
+        window.onload = function() {
+            const activeTab = localStorage.getItem('rsaActiveTab') || 'generate';
+            switchMode(activeTab);
+        };
     </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
-import os
 import struct
 import time
+
 from MD5Hash.MD5 import MyMD5
 from LinearCongruentialGenerator.LCG import LCG
 
@@ -39,11 +39,11 @@ class RC5:
         self.b = len(key)
         self.u = w // 8
         self.c = max(1, (self.b + self.u - 1) // self.u)
-        self.S = []
+        self.s_table = []
 
         if w == 32:
-            self.P = 0xB7E15163
-            self.Q = 0x9E3779B9
+            self.p_const = 0xB7E15163
+            self.q_const = 0x9E3779B9
         else:
             raise ValueError("Ця реалізація оптимізована для w=32")
 
@@ -59,51 +59,51 @@ class RC5:
         return ((val >> shift) | (val << (self.w - shift))) & (self.mod - 1)
 
     def _key_expansion(self):
-        L = [0] * self.c
+        l_table = [0] * self.c
         for i in range(self.b):
-            L[i // self.u] = (L[i // self.u] + (self.key[i] << (8 * (i % self.u)))) & (self.mod - 1)
+            l_table[i // self.u] = (l_table[i // self.u] + (self.key[i] << (8 * (i % self.u)))) & (self.mod - 1)
 
-        self.S = [0] * (2 * self.r + 2)
-        self.S[0] = self.P
-        for i in range(1, len(self.S)):
-            self.S[i] = (self.S[i - 1] + self.Q) & (self.mod - 1)
+        self.s_table = [0] * (2 * self.r + 2)
+        self.s_table[0] = self.p_const
+        for i in range(1, len(self.s_table)):
+            self.s_table[i] = (self.s_table[i - 1] + self.q_const) & (self.mod - 1)
 
         i = j = 0
-        A = B = 0
-        t = 2 * self.r + 2
-        iterations = 3 * max(t, self.c)
+        a_val = b_val = 0
+        t_val = 2 * self.r + 2
+        iterations = 3 * max(t_val, self.c)
 
         for _ in range(iterations):
-            A = self.S[i] = self._rol((self.S[i] + A + B) & (self.mod - 1), 3)
-            B = L[j] = self._rol((L[j] + A + B) & (self.mod - 1), A + B)
-            i = (i + 1) % t
+            a_val = self.s_table[i] = self._rol((self.s_table[i] + a_val + b_val) & (self.mod - 1), 3)
+            b_val = l_table[j] = self._rol((l_table[j] + a_val + b_val) & (self.mod - 1), a_val + b_val)
+            i = (i + 1) % t_val
             j = (j + 1) % self.c
 
     def encrypt_block(self, data: bytes) -> bytes:
-        A = int.from_bytes(data[:self.u], byteorder='little')
-        B = int.from_bytes(data[self.u:], byteorder='little')
+        a_val = int.from_bytes(data[:self.u], byteorder='little')
+        b_val = int.from_bytes(data[self.u:], byteorder='little')
 
-        A = (A + self.S[0]) & (self.mod - 1)
-        B = (B + self.S[1]) & (self.mod - 1)
+        a_val = (a_val + self.s_table[0]) & (self.mod - 1)
+        b_val = (b_val + self.s_table[1]) & (self.mod - 1)
 
         for i in range(1, self.r + 1):
-            A = (self._rol(A ^ B, B) + self.S[2 * i]) & (self.mod - 1)
-            B = (self._rol(B ^ A, A) + self.S[2 * i + 1]) & (self.mod - 1)
+            a_val = (self._rol(a_val ^ b_val, b_val) + self.s_table[2 * i]) & (self.mod - 1)
+            b_val = (self._rol(b_val ^ a_val, a_val) + self.s_table[2 * i + 1]) & (self.mod - 1)
 
-        return A.to_bytes(self.u, byteorder='little') + B.to_bytes(self.u, byteorder='little')
+        return a_val.to_bytes(self.u, byteorder='little') + b_val.to_bytes(self.u, byteorder='little')
 
     def decrypt_block(self, data: bytes) -> bytes:
-        A = int.from_bytes(data[:self.u], byteorder='little')
-        B = int.from_bytes(data[self.u:], byteorder='little')
+        a_val = int.from_bytes(data[:self.u], byteorder='little')
+        b_val = int.from_bytes(data[self.u:], byteorder='little')
 
         for i in range(self.r, 0, -1):
-            B = self._ror((B - self.S[2 * i + 1]) & (self.mod - 1), A) ^ A
-            A = self._ror((A - self.S[2 * i]) & (self.mod - 1), B) ^ B
+            b_val = self._ror((b_val - self.s_table[2 * i + 1]) & (self.mod - 1), a_val) ^ a_val
+            a_val = self._ror((a_val - self.s_table[2 * i]) & (self.mod - 1), b_val) ^ b_val
 
-        B = (B - self.S[1]) & (self.mod - 1)
-        A = (A - self.S[0]) & (self.mod - 1)
+        b_val = (b_val - self.s_table[1]) & (self.mod - 1)
+        a_val = (a_val - self.s_table[0]) & (self.mod - 1)
 
-        return A.to_bytes(self.u, byteorder='little') + B.to_bytes(self.u, byteorder='little')
+        return a_val.to_bytes(self.u, byteorder='little') + b_val.to_bytes(self.u, byteorder='little')
 
 
 class RC5FileProcessor:
@@ -123,7 +123,7 @@ class RC5FileProcessor:
         elif key_length_bits == 128:
             return hash_p
         elif key_length_bits == 256:
-            md5_2 = MyMD5()
+            md5_2 = MyMD5()  # NOSONAR
             md5_2.hash(hash_p)
             hash_h_p = struct.pack('<4I', md5_2.A, md5_2.B, md5_2.C, md5_2.D)
             return hash_h_p + hash_p
