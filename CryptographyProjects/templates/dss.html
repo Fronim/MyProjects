@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DSS Digital Signature Tool</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1e1e2e; color: #cdd6f4; padding: 40px; }
+        .container { max-width: 700px; margin: auto; background: #313244; padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+
+        h2 { text-align: center; color: #cdd6f4; margin-bottom: 10px; }
+        p.subtitle { text-align: center; color: #a6adc8; margin-bottom: 30px; font-size: 0.95em; }
+
+        .tab-container { display: flex; gap: 10px; margin-bottom: 25px; justify-content: center; }
+        .tab { padding: 10px 20px; cursor: pointer; background: #45475a; border-radius: 6px; font-weight: 500; transition: background 0.2s, color 0.2s; }
+        .tab.active { background: #89b4fa; color: #11111b; font-weight: bold; }
+
+        .section { display: none; }
+        .section.active { display: block; }
+
+        .input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+        label { display: block; color: #89b4fa; font-size: 0.9em; font-weight: 600; }
+        input, select, textarea { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #45475a; background: #181825; color: white; box-sizing: border-box; }
+        input[type="file"] { padding: 9px; cursor: pointer; }
+        textarea { resize: vertical; min-height: 80px; font-family: monospace; word-break: break-all; }
+
+        button { background: #a6e3a1; color: #11111b; border: none; padding: 14px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1em; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+
+        .status { margin-top: 20px; padding: 15px; border-radius: 6px; text-align: center; display: none; font-weight: 500; }
+        .success { background: rgba(166, 227, 161, 0.15); border: 1px solid #a6e3a1; color: #a6e3a1; }
+        .error { background: rgba(243, 139, 168, 0.15); border: 1px solid #f38ba8; color: #f38ba8; }
+
+        .signature-box { margin-top: 20px; background: rgba(137, 180, 250, 0.1); border: 1px solid #89b4fa; padding: 15px; border-radius: 6px; }
+        .signature-box label { color: #89b4fa; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <a href="/" style="color: #89b4fa; text-decoration: none;">< Back to Hub</a>
+        <h2>DSS Digital Signature</h2>
+        <div class="tab-container">
+            <div class="tab active" id="generateTab" onclick="switchMode('generate')">Key Generation</div>
+            <div class="tab" id="signTab" onclick="switchMode('sign')">Sign</div>
+            <div class="tab" id="verifyTab" onclick="switchMode('verify')">Verify</div>
+        </div>
+
+        {% if error %}
+        <div class="status error" style="display: block; margin-bottom: 20px;">{{ error }}</div>
+        {% endif %}
+        {% if message %}
+        <div class="status success" style="display: block; margin-bottom: 20px;">{{ message }}</div>
+        {% endif %}
+
+        <div id="generateSection" class="section active">
+            <form action="/dss" method="POST">
+                <input type="hidden" name="action" value="generate_keys">
+                <div class="input-group">
+                    <label for="key_size">Key Size:</label>
+                    <select name="key_size" id="key_size">
+                        <option value="1024">1024 bits</option>
+                        <option value="2048" selected>2048 bits</option>
+                        <option value="3072">3072 bits</option>
+                    </select>
+                </div>
+                <button type="submit">Generate and Download Keys</button>
+            </form>
+        </div>
+
+        <div id="signSection" class="section">
+            <form action="/dss" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" id="sign_action" value="sign_text">
+
+                <div class="input-group">
+                    <label>What do you want to sign?</label>
+                    <select id="sign_type" onchange="toggleSignType()">
+                        <option value="text">Text String</option>
+                        <option value="file">File</option>
+                    </select>
+                </div>
+
+                <div class="input-group" id="sign_text_group">
+                    <label>Text to Sign:</label>
+                    <textarea name="text_to_sign" placeholder="Enter your text here..."></textarea>
+                </div>
+
+                <div class="input-group" id="sign_file_group" style="display: none;">
+                    <label>File to Sign:</label>
+                    <input type="file" name="file_to_sign">
+                </div>
+
+                <div class="input-group">
+                    <label>Private Key (.pem):</label>
+                    <input type="file" name="private_key" accept=".pem" required>
+                </div>
+
+                <button type="submit">Generate Signature</button>
+            </form>
+
+            <!-- Блок відображення згенерованого підпису -->
+            {% if signature %}
+            <div class="signature-box">
+                <label>Generated Signature (HEX):</label>
+                <textarea readonly>{{ signature }}</textarea>
+            </div>
+            {% endif %}
+        </div>
+
+        <div id="verifySection" class="section">
+            <form action="/dss" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" id="verify_action" value="verify_text">
+
+                <div class="input-group">
+                    <label>What are you verifying?</label>
+                    <select id="verify_type" onchange="toggleVerifyType()">
+                        <option value="text">Text String</option>
+                        <option value="file">File</option>
+                    </select>
+                </div>
+
+                <div class="input-group" id="verify_text_group">
+                    <label>Original Text:</label>
+                    <textarea name="text_to_verify" placeholder="Enter the original text..."></textarea>
+                </div>
+
+                <div class="input-group" id="verify_file_group" style="display: none;">
+                    <label>Original File:</label>
+                    <input type="file" name="file_to_verify">
+                </div>
+
+                <div class="input-group">
+                    <label>Signature (HEX):</label>
+                    <textarea name="signature_hex" placeholder="Paste the HEX signature here..." required></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label>Public Key (.pem):</label>
+                    <input type="file" name="public_key" accept=".pem" required>
+                </div>
+
+                <button type="submit">Verify Signature</button>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+
+        function switchMode(mode) {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+
+            document.getElementById(mode + 'Section').classList.add('active');
+            document.getElementById(mode + 'Tab').classList.add('active');
+
+            localStorage.setItem('dssActiveTab', mode);
+        }
+
+        // Перемикання полів для підпису (Текст / Файл)
+        function toggleSignType() {
+            const type = document.getElementById('sign_type').value;
+            document.getElementById('sign_action').value = type === 'text' ? 'sign_text' : 'sign_file';
+            document.getElementById('sign_text_group').style.display = type === 'text' ? 'flex' : 'none';
+            document.getElementById('sign_file_group').style.display = type === 'file' ? 'flex' : 'none';
+        }
+
+        // Перемикання полів для верифікації (Текст / Файл)
+        function toggleVerifyType() {
+            const type = document.getElementById('verify_type').value;
+            document.getElementById('verify_action').value = type === 'text' ? 'verify_text' : 'verify_file';
+            document.getElementById('verify_text_group').style.display = type === 'text' ? 'flex' : 'none';
+            document.getElementById('verify_file_group').style.display = type === 'file' ? 'flex' : 'none';
+        }
+
+        // Відновлення вкладки після перезавантаження сторінки (відправки форми)
+        window.onload = function() {
+            const activeTab = localStorage.getItem('dssActiveTab') || 'generate';
+            switchMode(activeTab);
+        };
+    </script>
+</body>
+</html>

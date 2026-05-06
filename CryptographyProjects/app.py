@@ -6,6 +6,7 @@ import io
 import tempfile
 import zipfile
 
+from DSS.dss_signature import DSSManager
 from RC5Encryption.RC5 import RC5FileProcessor
 from flask import Flask, request, jsonify, render_template, send_file
 from LinearCongruentialGenerator.LCG import LCG
@@ -315,3 +316,122 @@ def rsa():
             error = f"Помилка: {str(e)}"
 
     return render_template('rsa.html', error=error, message=message)
+
+
+@app.route('/dss', methods=['GET', 'POST'])
+def dss():
+    error = None
+    message = None
+    signature = None
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        try:
+            if action == 'generate_keys':
+                key_size = int(request.form.get('key_size', 2048))
+                manager = DSSManager()
+                manager.generate_keys(key_size=key_size)
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    priv_path = os.path.join(temp_dir, 'private_key.pem')
+                    pub_path = os.path.join(temp_dir, 'public_key.pem')
+                    manager.save_keys_to_files(priv_path, pub_path)
+
+                    memory_file = io.BytesIO()
+                    with zipfile.ZipFile(memory_file, 'w') as zf:
+                        zf.write(priv_path, 'private_key.pem')
+                        zf.write(pub_path, 'public_key.pem')
+                    memory_file.seek(0)
+
+                return send_file(
+                    memory_file,
+                    mimetype='application/zip',
+                    as_attachment=True,
+                    download_name='dss_keys.zip'
+                )
+
+            elif action == 'sign_text':
+                text_to_sign = request.form.get('text_to_sign')
+                private_key_file = request.files.get('private_key')
+
+                if not text_to_sign or not private_key_file:
+                    raise ValueError("Введіть текст та завантажте приватний ключ.")
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    priv_path = os.path.join(temp_dir, 'private_key.pem')
+                    private_key_file.save(priv_path)
+
+                    manager = DSSManager()
+                    manager.load_private_key(priv_path)
+                    signature = manager.sign_text(text_to_sign)
+                    message = "Текст успішно підписано!"
+
+            elif action == 'verify_text':
+                text_to_verify = request.form.get('text_to_verify')
+                signature_hex = request.form.get('signature_hex')
+                public_key_file = request.files.get('public_key')
+
+                if not text_to_verify or not signature_hex or not public_key_file:
+                    raise ValueError("Заповніть всі поля та завантажте публічний ключ.")
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    pub_path = os.path.join(temp_dir, 'public_key.pem')
+                    public_key_file.save(pub_path)
+
+                    manager = DSSManager()
+                    manager.load_public_key(pub_path)
+                    is_valid = manager.verify_text(text_to_verify, signature_hex.strip())
+
+                    if is_valid:
+                        message = "Успіх! Підпис дійсний (текст належить автору)."
+                    else:
+                        error = "Помилка! Підпис НЕ дійсний або текст було змінено."
+
+            elif action == 'sign_file':
+                file_to_sign = request.files.get('file_to_sign')
+                private_key_file = request.files.get('private_key')
+
+                if not file_to_sign or not private_key_file:
+                    raise ValueError("Завантажте файл для підпису та приватний ключ.")
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    file_path = os.path.join(temp_dir, 'upload_file')
+                    priv_path = os.path.join(temp_dir, 'private_key.pem')
+
+                    file_to_sign.save(file_path)
+                    private_key_file.save(priv_path)
+
+                    manager = DSSManager()
+                    manager.load_private_key(priv_path)
+                    signature = manager.sign_file(file_path)
+                    message = f"Файл {file_to_sign.filename} успішно підписано!"
+
+            elif action == 'verify_file':
+                file_to_verify = request.files.get('file_to_verify')
+                signature_hex = request.form.get('signature_hex')
+                public_key_file = request.files.get('public_key')
+
+                if not file_to_verify or not signature_hex or not public_key_file:
+                    raise ValueError("Завантажте файл, публічний ключ та введіть підпис.")
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    file_path = os.path.join(temp_dir, 'upload_file')
+                    pub_path = os.path.join(temp_dir, 'public_key.pem')
+
+                    file_to_verify.save(file_path)
+                    public_key_file.save(pub_path)
+
+                    manager = DSSManager()
+                    manager.load_public_key(pub_path)
+                    is_valid = manager.verify_file(file_path, signature_hex.strip())
+
+                    if is_valid:
+                        message = f"Успіх! Підпис для файлу {file_to_verify.filename} дійсний."
+                    else:
+                        error = "Помилка! Підпис для файлу НЕ дійсний."
+
+        except Exception as e:
+            error = f"Помилка: {str(e)}"
+
+    return render_template('dss.html', error=error, message=message, signature=signature)
