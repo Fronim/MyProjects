@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 def sigmoid(z: np.array):
     return 1 / (1 + np.exp(-z))
 
-class LogisticRegression():
+class LogisticRegression:
     def __init__(self, lr=0.1, iterations=500, tol=1e-7):
         self.x = None
         self.y = None
